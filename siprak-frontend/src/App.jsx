@@ -399,11 +399,11 @@ function App() {
              s.masterPraktikum.hari.toLowerCase() === praktikum.hari.toLowerCase() && 
              s.masterPraktikum.shift === praktikum.shift;
     });
-    if (hasTimeOverlap) return "Shift Sama (Bentrok)";
+    if (hasTimeOverlap) return "Sesi Sama (Bentrok)";
 
     // 3. Count weekly assignments in current draft
     const load = weeklySchedules.filter(s => s.personilId === personil.id).length;
-    if (load >= 2) return `Beban Kerja Penuh (${load} Shift)`;
+    if (load >= 4) return `Beban Kerja Penuh (${load} Sesi)`;
 
     return "Tersedia";
   };
@@ -752,14 +752,14 @@ function App() {
             <div className="page-header">
               <div className="page-title">
                 <h1>Daftar Kelas Praktikum</h1>
-                <p>Tentukan hari dan shift pelaksanaan praktikum laboratorium semester ini.</p>
+                <p>Tentukan hari dan sesi pelaksanaan praktikum laboratorium semester ini.</p>
               </div>
               {renderWeekSelector()}
             </div>
 
             <div className="glass-container" style={{ marginBottom: '24px' }}>
               <div className="container-header">
-                <h3 className="container-title">Tambah Shift Praktikum Baru</h3>
+                <h3 className="container-title">Tambah Sesi Praktikum Baru</h3>
               </div>
               <form onSubmit={handleAddPraktikum} className="form-grid">
                 <div className="form-group">
@@ -802,7 +802,7 @@ function App() {
                 </div>
                 <div className="form-group" style={{ justifyContent: 'flex-end' }}>
                   <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
-                    <Icons.Plus /> Tambah Shift
+                    <Icons.Plus /> Tambah Sesi
                   </button>
                 </div>
               </form>

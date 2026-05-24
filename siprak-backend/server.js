@@ -331,7 +331,7 @@ async function jalankanPenjadwalanOtomatis(minggu) {
                 return true;
             }
 
-            if (assignments[p_idx].length === 2) {
+            if (assignments[p_idx].length === 4) {
                 return search(p_idx + 1, 0);
             }
 
@@ -371,7 +371,7 @@ async function jalankanPenjadwalanOtomatis(minggu) {
     let usedMin = 0;
     let usedMax = 0;
 
-    const targetAverage = (2 * N) / C;
+    const targetAverage = (4 * N) / C;
     const strictMin = Math.floor(targetAverage);
     const strictMax = Math.ceil(targetAverage);
 
