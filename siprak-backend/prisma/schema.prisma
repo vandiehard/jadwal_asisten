@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model alokasijaga {
+  id                Int             @id @default(autoincrement())
+  personilId        Int
+  masterPraktikumId Int
+  masterpraktikum   masterpraktikum @relation(fields: [masterPraktikumId], references: [id], map: "AlokasiJaga_masterPraktikumId_fkey")
+  personil          personil        @relation(fields: [personilId], references: [id], map: "AlokasiJaga_personilId_fkey")
+
+  @@index([masterPraktikumId], map: "AlokasiJaga_masterPraktikumId_fkey")
+  @@index([personilId], map: "AlokasiJaga_personilId_fkey")
+}
+
+model jadwalkuliahstatis {
+  id               Int      @id @default(autoincrement())
+  personilId       Int
+  hari             String
+  jamMulaiIndeks   Int
+  jamSelesaiIndeks Int
+  personil         personil @relation(fields: [personilId], references: [id], map: "JadwalKuliahStatis_personilId_fkey")
+
+  @@index([personilId], map: "JadwalKuliahStatis_personilId_fkey")
+}
+
+model masterpraktikum {
+  id          Int           @id @default(autoincrement())
+  hari        String
+  shift       Int
+  sesi        String
+  alokasijaga alokasijaga[]
+}
+
+model personil {
+  id                 Int                  @id @default(autoincrement())
+  nama               String
+  role               String
+  kontak_wa          String?
+  alokasijaga        alokasijaga[]
+  jadwalkuliahstatis jadwalkuliahstatis[]
+  rekapkeuangan      rekapkeuangan[]
+}
+
+model rekapkeuangan {
+  id         Int      @id @default(autoincrement())
+  personilId Int
+  kategori   String
+  nominal    Int
+  status     String
+  tanggal    DateTime @default(now())
+  personil   personil @relation(fields: [personilId], references: [id], map: "RekapKeuangan_personilId_fkey")
+
+  @@index([personilId], map: "RekapKeuangan_personilId_fkey")
+}
