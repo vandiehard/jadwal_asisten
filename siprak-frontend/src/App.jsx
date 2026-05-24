@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
@@ -11,7 +11,6 @@ const Icons = {
   Personil: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   Practikum: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/><path d="M6 14h10"/></svg>,
   Scheduler: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-  Finance: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
   Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>,
   Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
@@ -20,6 +19,7 @@ const Icons = {
 
 function App() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedWeek, setSelectedWeek] = useState(1);
 
   // Backend URL configuration
   const API_URL = 'http://localhost:5000/api';
@@ -27,13 +27,11 @@ function App() {
   // State Lists
   const [personils, setPersonils] = useState([]);
   const [praktikums, setPraktikums] = useState([]);
-  const [finances, setFinances] = useState([]);
   const [weeklySchedules, setWeeklySchedules] = useState([]); // Draftweekly schedule
 
   // Form inputs
   const [newPersonil, setNewPersonil] = useState({ nama: '', role: 'Asisten', kontak_wa: '' });
   const [newPraktikum, setNewPraktikum] = useState({ hari: 'Senin', shift: '1', sesi: '07:30 - 08:30' });
-  const [newFine, setNewFine] = useState({ personilId: '', menitTelat: '' });
 
   // Modal static schedule variables
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,13 +63,10 @@ function App() {
       const pRes = await axios.get(`${API_URL}/personil`);
       setPersonils(pRes.data);
 
-      const prRes = await axios.get(`${API_URL}/praktikum`);
+      const prRes = await axios.get(`${API_URL}/praktikum?minggu=${selectedWeek}`);
       setPraktikums(prRes.data);
 
-      const fRes = await axios.get(`${API_URL}/keuangan`);
-      setFinances(fRes.data);
-
-      const sRes = await axios.get(`${API_URL}/schedule/current`);
+      const sRes = await axios.get(`${API_URL}/schedule/current?minggu=${selectedWeek}`);
       setWeeklySchedules(sRes.data);
     } catch (error) {
       console.error("Gagal fetch data backend:", error);
@@ -80,7 +75,7 @@ function App() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedWeek]);
 
   const MATRIKS_GUNADARMA = {
     1: { start: "07:30", end: "08:30" },
@@ -295,7 +290,7 @@ function App() {
 
   const handleGenerateSchedule = async () => {
     try {
-      const res = await axios.post(`${API_URL}/schedule/generate`);
+      const res = await axios.post(`${API_URL}/schedule/generate`, { minggu: selectedWeek });
       setWeeklySchedules(res.data.schedule);
       showToast(`${res.data.message}\nStaffing Range: ${res.data.minStaffing} - ${res.data.maxStaffing} personil per kelas.`, "success");
     } catch (error) {
@@ -310,13 +305,14 @@ function App() {
   const handleSaveWeeklySchedule = async () => {
     try {
       await axios.post(`${API_URL}/schedule/save`, {
+        minggu: selectedWeek,
         alokasi: weeklySchedules.map(s => ({
           personilId: s.personilId,
           masterPraktikumId: s.masterPraktikumId
         }))
       });
       fetchData();
-      showToast("Jadwal mingguan berhasil disimpan ke database!", "success");
+      showToast(`Jadwal minggu ${selectedWeek} berhasil disimpan ke database!`, "success");
     } catch (error) {
       showToast("Gagal menyimpan jadwal mingguan: " + error.message, "error");
     }
@@ -333,6 +329,7 @@ function App() {
     const formData = new FormData();
     formData.append('krsImage', autoScheduleFile);
     formData.append('personilId', autoSchedulePersonilId);
+    formData.append('minggu', selectedWeek);
 
     try {
       const res = await axios.post(`${API_URL}/schedule/upload-and-assign`, formData, {
@@ -434,9 +431,55 @@ function App() {
       'No WA': item.personil.kontak_wa || '-'
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Apply column widths
+    ws['!cols'] = [
+      { wch: 15 }, // Hari
+      { wch: 10 }, // Shift
+      { wch: 20 }, // Sesi
+      { wch: 25 }, // Nama
+      { wch: 15 }, // Role
+      { wch: 20 }  // No WA
+    ];
+
+    // Apply header styles (purple background, white bold text)
+    if (ws['!ref']) {
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const address = XLSX.utils.encode_col(C) + "1";
+        if (!ws[address]) continue;
+        ws[address].s = {
+          fill: { fgColor: { rgb: "7B3FE4" } },
+          font: { color: { rgb: "FFFFFF" }, bold: true },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          }
+        };
+      }
+
+      // Apply basic borders for data cells
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const address = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!ws[address]) continue;
+          ws[address].s = {
+            border: {
+              top: { style: "thin", color: { rgb: "CCCCCC" } },
+              bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+              left: { style: "thin", color: { rgb: "CCCCCC" } },
+              right: { style: "thin", color: { rgb: "CCCCCC" } }
+            }
+          };
+        }
+      }
+    }
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Jadwal Jaga');
-    XLSX.writeFile(wb, 'Jadwal_Siprak_v2.0.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, `Jadwal Jaga M${selectedWeek}`);
+    XLSX.writeFile(wb, `Jadwal_Siprak_Minggu_${selectedWeek}.xlsx`);
   };
 
   const handleExportPDF = () => {
@@ -464,85 +507,6 @@ function App() {
     doc.save('Jadwal_Siprak_v2.0.pdf');
   };
 
-  // =================== FINANCIAL MODULES ===================
-
-  const handleAddFine = async (e) => {
-    e.preventDefault();
-    if (!newFine.personilId) {
-      showToast("Pilih personil terlebih dahulu.", "error");
-      return;
-    }
-    if (!newFine.menitTelat || newFine.menitTelat <= 0) {
-      showToast("Durasi telat harus lebih dari 0 menit.", "error");
-      return;
-    }
-    try {
-      await axios.post(`${API_URL}/keuangan/denda`, newFine);
-      setNewFine({ personilId: '', menitTelat: '' });
-      fetchData();
-      showToast("Denda keterlambatan berhasil dicatat.", "success");
-    } catch (error) {
-      showToast("Error adding fine: " + error.message, "error");
-    }
-  };
-
-  const handleGenerateMonthlyKas = () => {
-    showConfirm("Yakin ingin menagih kas bulanan sebesar Rp 20.000 untuk seluruh asisten aktif?", async () => {
-      try {
-        const res = await axios.post(`${API_URL}/keuangan/kas-bulanan`);
-        fetchData();
-        showToast(res.data.message, "success");
-      } catch (error) {
-        showToast("Error generating monthly cash: " + error.message, "error");
-      }
-    });
-  };
-
-  const handleToggleKeuanganStatus = async (id, currentStatus) => {
-    const newStatus = currentStatus === 'Lunas' ? 'Belum Lunas' : 'Lunas';
-    try {
-      await axios.put(`${API_URL}/keuangan/${id}/status`, { status: newStatus });
-      fetchData();
-      showToast("Status keuangan berhasil diperbarui.", "success");
-    } catch (error) {
-      showToast("Error updating status: " + error.message, "error");
-    }
-  };
-
-  const handleDeleteKeuangan = (id) => {
-    showConfirm("Yakin ingin menghapus record keuangan ini?", async () => {
-      try {
-        await axios.delete(`${API_URL}/keuangan/${id}`);
-        fetchData();
-        showToast("Data keuangan berhasil dihapus.", "success");
-      } catch (error) {
-        showToast("Error deleting record: " + error.message, "error");
-      }
-    });
-  };
-
-  // Financial summary compilation
-  const getFinancialSummary = () => {
-    let totalDendaUnpaid = 0;
-    let totalKasUnpaid = 0;
-    let totalPaid = 0;
-
-    finances.forEach(f => {
-      if (f.status === 'Lunas') {
-        totalPaid += f.nominal;
-      } else {
-        if (f.kategori === 'Denda Keterlambatan') {
-          totalDendaUnpaid += f.nominal;
-        } else {
-          totalKasUnpaid += f.nominal;
-        }
-      }
-    });
-
-    return { totalDendaUnpaid, totalKasUnpaid, totalPaid };
-  };
-
-  const finSummary = getFinancialSummary();
 
   return (
     <div className="app-container">
@@ -573,10 +537,6 @@ function App() {
             <Icons.Scheduler />
             <span>Auto-Scheduler</span>
           </div>
-          <div className={`nav-item ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}>
-            <Icons.Finance />
-            <span>Keuangan</span>
-          </div>
         </div>
 
         <div className="sidebar-footer">
@@ -590,6 +550,21 @@ function App() {
 
       {/* Main Content Dashboard */}
       <div className="main-content">
+        
+        {/* GLOBAL WEEK SELECTOR */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px', alignItems: 'center', gap: '10px' }}>
+          <label style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Pilih Minggu:</label>
+          <select 
+            className="form-control" 
+            style={{ width: '150px' }}
+            value={selectedWeek} 
+            onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(m => (
+              <option key={m} value={m}>Minggu {m}</option>
+            ))}
+          </select>
+        </div>
         
         {/* TAB OVERVIEW */}
         {activeTab === 'overview' && (
@@ -619,24 +594,6 @@ function App() {
                 </div>
                 <div className="kpi-icon">
                   <Icons.Practikum />
-                </div>
-              </div>
-              <div className="kpi-card rose">
-                <div className="kpi-info">
-                  <h3>Tunggakan Denda</h3>
-                  <div className="kpi-value">Rp {finSummary.totalDendaUnpaid.toLocaleString('id-ID')}</div>
-                </div>
-                <div className="kpi-icon">
-                  <Icons.Finance />
-                </div>
-              </div>
-              <div className="kpi-card amber">
-                <div className="kpi-info">
-                  <h3>Kas Belum Lunas</h3>
-                  <div className="kpi-value">Rp {finSummary.totalKasUnpaid.toLocaleString('id-ID')}</div>
-                </div>
-                <div className="kpi-icon">
-                  <Icons.Finance />
                 </div>
               </div>
             </div>
@@ -750,8 +707,6 @@ function App() {
 
             <div className="personil-grid">
               {personils.map(p => {
-                const unpaidDendaCount = p.rekap_keuangan.filter(f => f.kategori === 'Denda Keterlambatan' && f.status === 'Belum Lunas').reduce((a, b) => a + b.nominal, 0);
-                const unpaidKasCount = p.rekap_keuangan.filter(f => f.kategori === 'Uang Kas Bulanan' && f.status === 'Belum Lunas').reduce((a, b) => a + b.nominal, 0);
                 return (
                   <div key={p.id} className="personil-card">
                     <div className="personil-card-header">
@@ -772,18 +727,6 @@ function App() {
                       <div className="personil-detail-item">
                         <span>Jadwal Statis:</span>
                         <strong style={{ color: 'var(--accent-primary)' }}>{p.jadwal_statis.length} Hari Kuliah</strong>
-                      </div>
-                      <div className="personil-detail-item">
-                        <span>Tunggakan Denda:</span>
-                        <strong style={{ color: unpaidDendaCount > 0 ? 'var(--accent-danger)' : 'var(--accent-secondary)' }}>
-                          Rp {unpaidDendaCount.toLocaleString('id-ID')}
-                        </strong>
-                      </div>
-                      <div className="personil-detail-item">
-                        <span>Kas Belum Bayar:</span>
-                        <strong style={{ color: unpaidKasCount > 0 ? 'var(--accent-warning)' : 'var(--accent-secondary)' }}>
-                          Rp {unpaidKasCount.toLocaleString('id-ID')}
-                        </strong>
                       </div>
                     </div>
 

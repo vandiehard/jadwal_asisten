@@ -51,7 +51,6 @@ app.get('/api/personil', async (req, res) => {
         const personils = await prisma.personil.findMany({
             include: {
                 jadwalkuliahstatis: true,
-                rekapkeuangan: true,
                 alokasijaga: {
                     include: {
                         masterpraktikum: true
@@ -67,7 +66,6 @@ app.get('/api/personil', async (req, res) => {
             role: p.role,
             kontak_wa: p.kontak_wa,
             jadwal_statis: p.jadwalkuliahstatis,
-            rekap_keuangan: p.rekapkeuangan,
             alokasi_jaga: p.alokasijaga.map(aj => ({
                 id: aj.id,
                 personilId: aj.personilId,
@@ -117,7 +115,6 @@ app.delete('/api/personil/:id', async (req, res) => {
         // Delete all dependent records using lowercase models
         await prisma.jadwalkuliahstatis.deleteMany({ where: { personilId: parseInt(id) } });
         await prisma.alokasijaga.deleteMany({ where: { personilId: parseInt(id) } });
-        await prisma.rekapkeuangan.deleteMany({ where: { personilId: parseInt(id) } });
         
         const personil = await prisma.personil.delete({
             where: { id: parseInt(id) }
@@ -161,8 +158,11 @@ app.post('/api/jadwal/bulk', async (req, res) => {
 
 // GET all practicum classes (lowercase model)
 app.get('/api/praktikum', async (req, res) => {
+    const minggu = parseInt(req.query.minggu) || 1;
     try {
-        const praktikum = await prisma.masterpraktikum.findMany();
+        const praktikum = await prisma.masterpraktikum.findMany({
+            where: { minggu }
+        });
         res.json(praktikum);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -173,10 +173,14 @@ app.get('/api/praktikum', async (req, res) => {
 app.post('/api/praktikum', async (req, res) => {
     const { hari, shift, sesi } = req.body;
     try {
-        const praktikum = await prisma.masterpraktikum.create({
-            data: { hari, shift: parseInt(shift), sesi }
+        const praktikumData = [];
+        for (let m = 1; m <= 8; m++) {
+            praktikumData.push({ hari, minggu: m, shift: parseInt(shift), sesi });
+        }
+        await prisma.masterpraktikum.createMany({
+            data: praktikumData
         });
-        res.json(praktikum);
+        res.json({ message: "Master Praktikum berhasil dibuat untuk Minggu 1 hingga 8" });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -215,8 +219,10 @@ app.delete('/api/praktikum/:id', async (req, res) => {
 
 // GET Current Scheduled Slots
 app.get('/api/schedule/current', async (req, res) => {
+    const minggu = parseInt(req.query.minggu) || 1;
     try {
         const alokasi = await prisma.alokasijaga.findMany({
+            where: { masterpraktikum: { minggu } },
             include: {
                 personil: true,
                 masterpraktikum: true
@@ -240,10 +246,13 @@ app.get('/api/schedule/current', async (req, res) => {
 
 // SAVE/Commit Weekly Schedule
 app.post('/api/schedule/save', async (req, res) => {
-    const { alokasi } = req.body; // array of { personilId, masterPraktikumId }
+    const { alokasi, minggu } = req.body; // array of { personilId, masterPraktikumId }
+    if (!minggu) return res.status(400).json({ error: "Parameter minggu dibutuhkan" });
     try {
         await prisma.$transaction([
-            prisma.alokasijaga.deleteMany({}), // Wipe old weekly schedule
+            prisma.alokasijaga.deleteMany({
+                where: { masterpraktikum: { minggu: parseInt(minggu) } }
+            }),
             prisma.alokasijaga.createMany({
                 data: alokasi.map(item => ({
                     personilId: parseInt(item.personilId),
@@ -251,26 +260,29 @@ app.post('/api/schedule/save', async (req, res) => {
                 }))
             })
         ]);
-        res.json({ message: "Jadwal mingguan berhasil disimpan!" });
+        res.json({ message: `Jadwal minggu ${minggu} berhasil disimpan!` });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // Helper: Backtracking Auto-Schedule Solver and Database Committer
-async function jalankanPenjadwalanOtomatis() {
+async function jalankanPenjadwalanOtomatis(minggu) {
+    if (!minggu) throw new Error("Parameter minggu dibutuhkan untuk Auto-Schedule.");
     const personils = await prisma.personil.findMany({
         include: {
             jadwalkuliahstatis: true
         }
     });
-    const classes = await prisma.masterpraktikum.findMany();
+    const classes = await prisma.masterpraktikum.findMany({
+        where: { minggu: parseInt(minggu) }
+    });
 
     if (personils.length === 0) {
         throw new Error("Tidak ada data Personil untuk dijadwalkan.");
     }
     if (classes.length === 0) {
-        throw new Error("Tidak ada data Master Praktikum untuk dijadwalkan.");
+        throw new Error(`Tidak ada data Master Praktikum di Minggu ${minggu} untuk dijadwalkan.`);
     }
 
     const N = personils.length;
@@ -413,7 +425,9 @@ async function jalankanPenjadwalanOtomatis() {
 
     // Automatically commit weekly schedule to database
     await prisma.$transaction([
-        prisma.alokasijaga.deleteMany({}),
+        prisma.alokasijaga.deleteMany({
+            where: { masterpraktikum: { minggu: parseInt(minggu) } }
+        }),
         prisma.alokasijaga.createMany({
             data: alokasiData
         })
@@ -428,10 +442,11 @@ async function jalankanPenjadwalanOtomatis() {
 
 // GENERATE Schedule with backtracking CSP solver
 app.post('/api/schedule/generate', async (req, res) => {
+    const minggu = parseInt(req.body.minggu);
     try {
-        const resObj = await jalankanPenjadwalanOtomatis();
+        const resObj = await jalankanPenjadwalanOtomatis(minggu);
         res.json({
-            message: "Jadwal berhasil digenerate otomatis",
+            message: `Jadwal minggu ${minggu} berhasil digenerate otomatis`,
             minStaffing: resObj.minStaffing,
             maxStaffing: resObj.maxStaffing,
             schedule: resObj.schedule
@@ -445,8 +460,9 @@ app.post('/api/schedule/generate', async (req, res) => {
 app.post('/api/schedule/upload-and-assign', upload.single('krsImage'), async (req, res) => {
     try {
         const personilId = parseInt(req.body.personilId);
-        if (!personilId) {
-            return res.status(400).json({ error: "Pilih Asisten / Programmer terlebih dahulu." });
+        const minggu = parseInt(req.body.minggu);
+        if (!personilId || !minggu) {
+            return res.status(400).json({ error: "Pilih Asisten dan Minggu terlebih dahulu." });
         }
         if (!req.file) {
             return res.status(400).json({ error: "Upload gambar KRS dulu brok." });
@@ -500,10 +516,10 @@ app.post('/api/schedule/upload-and-assign', upload.single('krsImage'), async (re
         }
 
         // 3. Re-run scheduling solver and auto-commit
-        const resObj = await jalankanPenjadwalanOtomatis();
+        const resObj = await jalankanPenjadwalanOtomatis(minggu);
 
         res.json({
-            message: "KRS berhasil diproses! Jadwal kuliah statis disimpan, dan jadwal jaga mingguan berhasil di-update.",
+            message: `KRS berhasil diproses! Jadwal statis disimpan, dan jadwal jaga minggu ${minggu} berhasil di-update.`,
             jadwalTerekstrak: results,
             schedule: resObj.schedule
         });
@@ -557,103 +573,6 @@ app.post('/api/jadwal/ocr', upload.single('krsImage'), async (req, res) => {
     }
 });
 
-// =================== FINANCIAL ENDPOINTS ===================
-
-// GET all financial logs (lowercase model)
-app.get('/api/keuangan', async (req, res) => {
-    try {
-        const rekap = await prisma.rekapkeuangan.findMany({
-            include: {
-                personil: true
-            },
-            orderBy: {
-                tanggal: 'desc'
-            }
-        });
-        res.json(rekap);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// POST record late fine (Rp 2.000 / Min) (lowercase model)
-app.post('/api/keuangan/denda', async (req, res) => {
-    const { personilId, menitTelat } = req.body;
-    const nominalDenda = parseInt(menitTelat) * 2000;
-    try {
-        const denda = await prisma.rekapkeuangan.create({
-            data: {
-                personilId: parseInt(personilId),
-                kategori: "Denda Keterlambatan",
-                nominal: nominalDenda,
-                status: "Belum Lunas"
-            },
-            include: {
-                personil: true
-            }
-        });
-        res.json({ message: "Denda keterlambatan berhasil dicatat", denda });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// POST generate monthly cash (Rp 20.000) for all active personil (lowercase model)
-app.post('/api/keuangan/kas-bulanan', async (req, res) => {
-    try {
-        const personils = await prisma.personil.findMany();
-        if (personils.length === 0) {
-            return res.status(400).json({ error: "Tidak ada data Personil untuk ditagih kas." });
-        }
-
-        const created = [];
-        for (const p of personils) {
-            const kas = await prisma.rekapkeuangan.create({
-                data: {
-                    personilId: p.id,
-                    kategori: "Uang Kas Bulanan",
-                    nominal: 20000,
-                    status: "Belum Lunas"
-                },
-                include: {
-                    personil: true
-                }
-            });
-            created.push(kas);
-        }
-        res.json({ message: `Uang Kas Bulanan berhasil digenerate untuk ${personils.length} personil.`, created });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// PUT toggle pay status (lowercase model)
-app.put('/api/keuangan/:id/status', async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body; // "Lunas" / "Belum Lunas"
-    try {
-        const updated = await prisma.rekapkeuangan.update({
-            where: { id: parseInt(id) },
-            data: { status }
-        });
-        res.json(updated);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// DELETE financial record (lowercase model)
-app.delete('/api/keuangan/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await prisma.rekapkeuangan.delete({
-            where: { id: parseInt(id) }
-        });
-        res.json({ message: "Rekap keuangan terhapus" });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
 
 const PORT = 5000;
 app.listen(PORT, () => console.log(`Backend Siprak jalan di port ${PORT} bro!`));

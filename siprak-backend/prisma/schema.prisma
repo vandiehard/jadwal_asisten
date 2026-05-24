@@ -32,6 +32,7 @@ model jadwalkuliahstatis {
 model masterpraktikum {
   id          Int           @id @default(autoincrement())
   hari        String
+  minggu      Int           @default(1)
   shift       Int
   sesi        String
   alokasijaga alokasijaga[]
@@ -44,17 +45,4 @@ model personil {
   kontak_wa          String?
   alokasijaga        alokasijaga[]
   jadwalkuliahstatis jadwalkuliahstatis[]
-  rekapkeuangan      rekapkeuangan[]
-}
-
-model rekapkeuangan {
-  id         Int      @id @default(autoincrement())
-  personilId Int
-  kategori   String
-  nominal    Int
-  status     String
-  tanggal    DateTime @default(now())
-  personil   personil @relation(fields: [personilId], references: [id], map: "RekapKeuangan_personilId_fkey")
-
-  @@index([personilId], map: "RekapKeuangan_personilId_fkey")
 }
