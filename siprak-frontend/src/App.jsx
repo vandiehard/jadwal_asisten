@@ -507,6 +507,21 @@ function App() {
     doc.save('Jadwal_Siprak_v2.0.pdf');
   };
 
+  const renderWeekSelector = () => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <label style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Minggu:</label>
+      <select 
+        className="form-control" 
+        style={{ width: '130px', padding: '6px 12px' }}
+        value={selectedWeek} 
+        onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
+      >
+        {[1, 2, 3, 4, 5, 6, 7, 8].map(m => (
+          <option key={m} value={m}>Minggu {m}</option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <div className="app-container">
@@ -551,21 +566,6 @@ function App() {
       {/* Main Content Dashboard */}
       <div className="main-content">
         
-        {/* GLOBAL WEEK SELECTOR */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px', alignItems: 'center', gap: '10px' }}>
-          <label style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Pilih Minggu:</label>
-          <select 
-            className="form-control" 
-            style={{ width: '150px' }}
-            value={selectedWeek} 
-            onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
-          >
-            {[1, 2, 3, 4, 5, 6, 7, 8].map(m => (
-              <option key={m} value={m}>Minggu {m}</option>
-            ))}
-          </select>
-        </div>
-        
         {/* TAB OVERVIEW */}
         {activeTab === 'overview' && (
           <div>
@@ -574,6 +574,7 @@ function App() {
                 <h1>Dashboard Overview</h1>
                 <p>Status operasional dan logistik praktikum minggu ini.</p>
               </div>
+              {renderWeekSelector()}
             </div>
 
             {/* KPI Summary Cards */}
@@ -753,6 +754,7 @@ function App() {
                 <h1>Daftar Kelas Praktikum</h1>
                 <p>Tentukan hari dan shift pelaksanaan praktikum laboratorium semester ini.</p>
               </div>
+              {renderWeekSelector()}
             </div>
 
             <div className="glass-container" style={{ marginBottom: '24px' }}>
@@ -857,13 +859,16 @@ function App() {
                 <h1>Penjadwalan Otomatis (Auto-Assign Engine)</h1>
                 <p>Hasilkan dan sesuaikan alokasi jaga asisten secara real-time.</p>
               </div>
-              <div className="btn-group">
-                <button className="btn btn-secondary" onClick={handleExportPNG}>Ekspor Gambar</button>
-                <button className="btn btn-secondary" onClick={handleExportExcel}>Ekspor Excel</button>
-                <button className="btn btn-secondary" onClick={handleExportPDF}>Ekspor PDF</button>
-                <button className="btn btn-emerald" onClick={handleGenerateSchedule}>
-                  <Icons.Generate /> Generate Otomatis
-                </button>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {renderWeekSelector()}
+                <div className="btn-group">
+                  <button className="btn btn-secondary" onClick={handleExportPNG}>Ekspor Gambar</button>
+                  <button className="btn btn-secondary" onClick={handleExportExcel}>Ekspor Excel</button>
+                  <button className="btn btn-secondary" onClick={handleExportPDF}>Ekspor PDF</button>
+                  <button className="btn btn-emerald" onClick={handleGenerateSchedule}>
+                    <Icons.Generate /> Generate Otomatis
+                  </button>
+                </div>
               </div>
             </div>
 

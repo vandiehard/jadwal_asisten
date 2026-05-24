@@ -469,35 +469,50 @@ app.post('/api/schedule/upload-and-assign', upload.single('krsImage'), async (re
         }
 
         // 1. Run OCR using Tesseract.js
-        const { data: { text } } = await Tesseract.recognize(
+        let { data: { text } } = await Tesseract.recognize(
             req.file.path,
             'eng'
         );
 
-        const results = [];
-        // Extract pattern, e.g. "Senin 4/5/6" or "Selasa: 1/2"
-        const regexCombo = /(senin|selasa|rabu|kamis|jumat|sabtu|minggu)[\s\:\-]*(\d+(?:\/\d+)+)/gi;
-        let match;
-        while ((match = regexCombo.exec(text)) !== null) {
-            const rawDay = match[1];
-            const capitalizeDay = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
-            results.push({
-                hari: capitalizeDay,
-                stringKRS: match[2]
-            });
-        }
+        // Pre-process text to fix common Tesseract OCR misreads for shift numbers
+        text = text
+            .replace(/23\/4/g, "2/3/4")
+            .replace(/56\/7/g, "5/6/7")
+            .replace(/1\/243/g, "1/2/3")
+            .replace(/(?<!\d)1243(?!\d)/g, "1/2/3")
+            .replace(/(?<!\d)45(?!\d)/g, "4/5")
+            .replace(/(?<!\d)12(?!\d)/g, "1/2")
+            .replace(/(?<!\d)23(?!\d)/g, "2/3")
+            .replace(/(?<!\d)34(?!\d)/g, "3/4")
+            .replace(/(?<!\d)56(?!\d)/g, "5/6")
+            .replace(/(?<!\d)67(?!\d)/g, "6/7")
+            .replace(/(?<!\d)78(?!\d)/g, "7/8")
+            .replace(/(?<!\d)8910(?!\d)/g, "8/9/10")
+            .replace(/(?<!\d)89\/10(?!\d)/g, "8/9/10")
+            .replace(/(?<!\d)8\/910(?!\d)/g, "8/9/10");
 
-        // Fallback: extract any slash numbers and suggest days
-        if (results.length === 0) {
-            const regexPolaJadwal = /\d+(?:\/\d+)+/g;
-            const matches = text.match(regexPolaJadwal) || [];
-            const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-            matches.forEach((m, idx) => {
-                results.push({
-                    hari: days[idx % 7],
-                    stringKRS: m
+        const results = [];
+        const lines = text.split('\n');
+        let currentDay = null;
+
+        for (const line of lines) {
+            const dayMatch = line.match(/(senin|selasa|rabu|kamis|jumat|sabtu|minggu)/i);
+            if (dayMatch) {
+                const rawDay = dayMatch[1];
+                currentDay = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
+            }
+
+            // Hanya match shift 1-14 tanpa word boundary (\b) agar tahan terhadap teks yang menempel (misal Keuangan1/2/3 atau **1/2/3)
+            // UPDATE: Toleransi spasi di sekitar slash karena Tesseract kadang menambahkan spasi (misal 1 / 2 / 3)
+            const shiftMatches = line.match(/(?<!\d)(?:[1-9]|1[0-4])(?:\s*\/\s*(?:[1-9]|1[0-4]))+(?!\d)/g);
+            if (shiftMatches && shiftMatches.length > 0) {
+                shiftMatches.forEach(shiftStr => {
+                    results.push({
+                        hari: currentDay || 'Senin',
+                        stringKRS: shiftStr.replace(/\s+/g, '')
+                    });
                 });
-            });
+            }
         }
 
         // 2. Clear old static schedules and save the newly extracted ones
@@ -534,33 +549,50 @@ app.post('/api/jadwal/ocr', upload.single('krsImage'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).send('Upload gambar KRS dulu brok.');
 
-        const { data: { text } } = await Tesseract.recognize(
+        let { data: { text } } = await Tesseract.recognize(
             req.file.path,
             'eng'
         );
 
-        const results = [];
-        const regexCombo = /(senin|selasa|rabu|kamis|jumat|sabtu|minggu)[\s\:\-]*(\d+(?:\/\d+)+)/gi;
-        let match;
-        while ((match = regexCombo.exec(text)) !== null) {
-            const rawDay = match[1];
-            const capitalizeDay = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
-            results.push({
-                hari: capitalizeDay,
-                stringKRS: match[2]
-            });
-        }
+        // Pre-process text to fix common Tesseract OCR misreads for shift numbers
+        text = text
+            .replace(/23\/4/g, "2/3/4")
+            .replace(/56\/7/g, "5/6/7")
+            .replace(/1\/243/g, "1/2/3")
+            .replace(/(?<!\d)1243(?!\d)/g, "1/2/3")
+            .replace(/(?<!\d)45(?!\d)/g, "4/5")
+            .replace(/(?<!\d)12(?!\d)/g, "1/2")
+            .replace(/(?<!\d)23(?!\d)/g, "2/3")
+            .replace(/(?<!\d)34(?!\d)/g, "3/4")
+            .replace(/(?<!\d)56(?!\d)/g, "5/6")
+            .replace(/(?<!\d)67(?!\d)/g, "6/7")
+            .replace(/(?<!\d)78(?!\d)/g, "7/8")
+            .replace(/(?<!\d)8910(?!\d)/g, "8/9/10")
+            .replace(/(?<!\d)89\/10(?!\d)/g, "8/9/10")
+            .replace(/(?<!\d)8\/910(?!\d)/g, "8/9/10");
 
-        if (results.length === 0) {
-            const regexPolaJadwal = /\d+(?:\/\d+)+/g;
-            const matches = text.match(regexPolaJadwal) || [];
-            const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-            matches.forEach((m, idx) => {
-                results.push({
-                    hari: days[idx % 7],
-                    stringKRS: m
+        const results = [];
+        const lines = text.split('\n');
+        let currentDay = null;
+
+        for (const line of lines) {
+            const dayMatch = line.match(/(senin|selasa|rabu|kamis|jumat|sabtu|minggu)/i);
+            if (dayMatch) {
+                const rawDay = dayMatch[1];
+                currentDay = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
+            }
+
+            // Hanya match shift 1-14 tanpa word boundary (\b) agar tahan terhadap teks yang menempel (misal Keuangan1/2/3 atau **1/2/3)
+            // UPDATE: Toleransi spasi di sekitar slash karena Tesseract kadang menambahkan spasi (misal 1 / 2 / 3)
+            const shiftMatches = line.match(/(?<!\d)(?:[1-9]|1[0-4])(?:\s*\/\s*(?:[1-9]|1[0-4]))+(?!\d)/g);
+            if (shiftMatches && shiftMatches.length > 0) {
+                shiftMatches.forEach(shiftStr => {
+                    results.push({
+                        hari: currentDay || 'Senin',
+                        stringKRS: shiftStr.replace(/\s+/g, '')
+                    });
                 });
-            });
+            }
         }
 
         res.json({ 
